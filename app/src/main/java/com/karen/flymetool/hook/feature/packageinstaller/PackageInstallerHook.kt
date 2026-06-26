@@ -14,50 +14,29 @@ object PackageInstallerHook : FeatureHook {
     private const val HOOK_NAME = "PackageInstaller"
 
     private var autoInstallEnabled = false
-    private var skipInstallScanEnabled = false
     private var skipSafetyCheckEnabled = false
     private var enableNativeInstallerEnabled = false
 
     override fun handle(lpparam: XC_LoadPackage.LoadPackageParam, packageName: String) {
         if (lpparam.packageName != "com.android.packageinstaller") return
 
-        skipInstallScanEnabled = XposedPrefs.isFeatureEnabled(lpparam, packageName, "skip_install_scan")
         skipSafetyCheckEnabled = XposedPrefs.isFeatureEnabled(lpparam, packageName, "skip_safety_check")
         enableNativeInstallerEnabled = XposedPrefs.isFeatureEnabled(lpparam, packageName, "enable_native_installer")
         autoInstallEnabled = XposedPrefs.isFeatureEnabled(lpparam, packageName, "auto_install")
 
         try {
-            if (skipInstallScanEnabled) {
-                hookStartInstallScan(lpparam)
-            }
             if (skipSafetyCheckEnabled) {
                 hookSafetyCheck(lpparam)
             }
             if (enableNativeInstallerEnabled) {
                 hookNativeInstaller(lpparam)
             }
-            if (skipInstallScanEnabled || skipSafetyCheckEnabled || enableNativeInstallerEnabled) {
+            if (skipSafetyCheckEnabled || enableNativeInstallerEnabled) {
                 Logger.i(HOOK_NAME, "Hooks installed successfully")
             }
         } catch (e: Throwable) {
             Logger.e(HOOK_NAME, "Hook failed", e)
         }
-    }
-
-    private fun hookStartInstallScan(lpparam: XC_LoadPackage.LoadPackageParam) {
-        XposedHelpers.findAndHookMethod(
-            ACTIVITY_CLASS,
-            lpparam.classLoader,
-            "startInstallScan",
-            object : XC_MethodHook() {
-                override fun beforeHookedMethod(param: MethodHookParam) {
-                    XposedHelpers.setObjectField(param.thisObject, "mIsVirusCheckFinish", true)
-                    XposedHelpers.setObjectField(param.thisObject, "mIsVirusCheckResultSafe", true)
-                    XposedHelpers.setObjectField(param.thisObject, "receivedMzStoreInfo", true)
-                    Logger.i(HOOK_NAME, "startInstallScan: skip virus check")
-                }
-            }
-        )
     }
 
     private fun hookSafetyCheck(lpparam: XC_LoadPackage.LoadPackageParam) {
