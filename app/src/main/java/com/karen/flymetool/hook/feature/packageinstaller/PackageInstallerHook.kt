@@ -16,7 +16,6 @@ object PackageInstallerHook : FeatureHook {
     private var autoInstallEnabled = false
     private var skipInstallScanEnabled = false
     private var enableNativeInstallerEnabled = false
-    private var skipSafetyCheckEnabled = false
 
     override fun handle(lpparam: XC_LoadPackage.LoadPackageParam, packageName: String) {
         if (lpparam.packageName != "com.android.packageinstaller") return
@@ -24,19 +23,16 @@ object PackageInstallerHook : FeatureHook {
         skipInstallScanEnabled = XposedPrefs.isFeatureEnabled(lpparam, packageName, "skip_install_scan")
         enableNativeInstallerEnabled = XposedPrefs.isFeatureEnabled(lpparam, packageName, "enable_native_installer")
         autoInstallEnabled = XposedPrefs.isFeatureEnabled(lpparam, packageName, "auto_install")
-        skipSafetyCheckEnabled = XposedPrefs.isFeatureEnabled(lpparam, packageName, "skip_safety_check")
 
         try {
             if (skipInstallScanEnabled) {
                 hookStartInstallScan(lpparam)
+                hookSafetyCheck(lpparam)
             }
             if (enableNativeInstallerEnabled) {
                 hookNativeInstaller(lpparam)
             }
-            if (skipSafetyCheckEnabled) {
-                hookSafetyCheck(lpparam)
-            }
-            if (skipInstallScanEnabled || enableNativeInstallerEnabled || skipSafetyCheckEnabled) {
+            if (skipInstallScanEnabled || enableNativeInstallerEnabled) {
                 Logger.i(HOOK_NAME, "Hooks installed successfully")
             }
         } catch (e: Throwable) {
