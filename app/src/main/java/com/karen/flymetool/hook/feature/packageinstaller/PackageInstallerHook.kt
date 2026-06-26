@@ -46,8 +46,14 @@ object PackageInstallerHook : FeatureHook {
             "setVirusCheckTime",
             object : XC_MethodReplacement() {
                 override fun replaceHookedMethod(param: MethodHookParam) {
-                    val mHandler = XposedHelpers.getObjectField(param.thisObject, "mHandler")
-                    XposedHelpers.callMethod(mHandler, "sendEmptyMessage", 5)
+                    val thisObject = param.thisObject
+                    if (autoInstallEnabled) {
+                        XposedHelpers.callMethod(thisObject, "doInstallFlyme")
+                        Logger.d(HOOK_NAME, "Auto install triggered")
+                    } else {
+                        val mHandler = XposedHelpers.getObjectField(thisObject, "mHandler")
+                        XposedHelpers.callMethod(mHandler, "sendEmptyMessage", 5)
+                    }
                 }
             }
         )
