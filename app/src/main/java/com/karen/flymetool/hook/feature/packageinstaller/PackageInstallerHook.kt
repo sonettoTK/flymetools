@@ -86,7 +86,11 @@ object PackageInstallerHook : FeatureHook {
             "com.meizu.safe.security.utils.Utils",
             lpparam.classLoader,
             "isCtsRunning",
-            XC_MethodHook.returnConstant(true)
+            object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    param.result = true
+                }
+            }
         )
         Logger.i(HOOK_NAME, "Hooked isCtsRunning -> true (native installer)")
     }
