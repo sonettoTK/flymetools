@@ -13,16 +13,26 @@ object PackageInstallerHook : FeatureHook {
     private const val HOOK_NAME = "PackageInstaller"
 
     private var autoInstallEnabled = false
+    private var skipInstallScanEnabled = false
+    private var enableNativeInstallerEnabled = false
 
     override fun handle(lpparam: XC_LoadPackage.LoadPackageParam, packageName: String) {
-        if (!XposedPrefs.isFeatureEnabled(lpparam, packageName, "skip_install_scan")) return
         if (lpparam.packageName != "com.android.packageinstaller") return
 
+        skipInstallScanEnabled = XposedPrefs.isFeatureEnabled(lpparam, packageName, "skip_install_scan")
+        enableNativeInstallerEnabled = XposedPrefs.isFeatureEnabled(lpparam, packageName, "enable_native_installer")
         autoInstallEnabled = XposedPrefs.isFeatureEnabled(lpparam, packageName, "auto_install")
 
         try {
-            hookStartInstallScan(lpparam)
-            Logger.i(HOOK_NAME, "Hooks installed successfully")
+            if (skipInstallScanEnabled) {
+                hookStartInstallScan(lpparam)
+            }
+            if (enableNativeInstallerEnabled) {
+                hookNativeInstaller(lpparam)
+            }
+            if (skipInstallScanEnabled || enableNativeInstallerEnabled) {
+                Logger.i(HOOK_NAME, "Hooks installed successfully")
+            }
         } catch (e: Throwable) {
             Logger.e(HOOK_NAME, "Hook failed", e)
         }
@@ -69,5 +79,15 @@ object PackageInstallerHook : FeatureHook {
         )
 
         Logger.i(HOOK_NAME, "Hooked startInstallScan")
+    }
+
+    private fun hookNativeInstaller(lpparam: XC_LoadPackage.LoadPackageParam) {
+        XposedHelpers.findAndHookMethod(
+            "com.meizu.safe.security.utils.Utils",
+            lpparam.classLoader,
+            "isCtsRunning",
+            XC_MethodHook.returnConstant(true)
+        )
+        Logger.i(HOOK_NAME, "Hooked isCtsRunning -> true (native installer)")
     }
 }

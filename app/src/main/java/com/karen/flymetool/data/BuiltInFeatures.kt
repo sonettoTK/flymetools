@@ -65,6 +65,8 @@ val builtInFeatures: Map<String, List<HookFeature>> = mapOf(
         HookFeature("auto_install", "自动安装",
             description = "跳过扫描后自动进入安装，无需手动点击安装按钮",
             dependsOn = "skip_install_scan"),
+        HookFeature("enable_native_installer", "启用原生应用安装界面",
+            description = "使用 Android 原生安装界面替换 Flyme 定制的安装界面"),
     ),
     "android" to listOf(
         HookFeature("force_super_stereo", "强制立体音效",
