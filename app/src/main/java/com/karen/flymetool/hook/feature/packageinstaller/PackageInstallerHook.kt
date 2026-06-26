@@ -78,40 +78,13 @@ object PackageInstallerHook : FeatureHook {
             clazz,
             "startInstallScan",
             object : XC_MethodHook() {
-                override fun beforeHookedMethod(param: MethodHookParam) {
-                    val thisObject = param.thisObject
-
-                    XposedHelpers.setBooleanField(thisObject, "mIsVirusCheckFinish", true)
-                    XposedHelpers.setBooleanField(thisObject, "mIsVirusCheckResultSafe", true)
-                    XposedHelpers.setBooleanField(thisObject, "receivedMzStoreInfo", true)
-                    XposedHelpers.setIntField(thisObject, "isDisposaled", 0)
-                    XposedHelpers.setBooleanField(thisObject, "isBlackApp", false)
-
-                    val mzStoreAppInfo = XposedHelpers.getObjectField(thisObject, "mzStoreAppInfo")
-                    if (mzStoreAppInfo != null) {
-                        XposedHelpers.setBooleanField(mzStoreAppInfo, "querySuccess", false)
-                        XposedHelpers.setBooleanField(mzStoreAppInfo, "showConfirm", false)
-                        XposedHelpers.setBooleanField(mzStoreAppInfo, "icpStatus", false)
-                        XposedHelpers.setBooleanField(mzStoreAppInfo, "isDisposalApp", false)
-                        XposedHelpers.setBooleanField(mzStoreAppInfo, "isBlackApp", false)
-                    }
-
-                    Logger.d(HOOK_NAME, "Skipped install scan")
-
-                    if (autoInstallEnabled) {
-                        XposedHelpers.callMethod(thisObject, "doInstallFlyme")
-                        Logger.d(HOOK_NAME, "Auto install triggered")
-                    } else {
-                        XposedHelpers.callMethod(thisObject, "updateViewForNewState", 3)
-                        Logger.d(HOOK_NAME, "Showing install confirm UI")
-                    }
-
-                    param.result = null
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    XposedHelpers.callMethod(param.thisObject, "doInstallFlyme")
                 }
             }
         )
 
-        Logger.i(HOOK_NAME, "Hooked startInstallScan")
+        Logger.i(HOOK_NAME, "Hooked startInstallScan -> trigger auto install via doInstallFlyme")
     }
 
     private fun hookNativeInstaller(lpparam: XC_LoadPackage.LoadPackageParam) {
