@@ -2,6 +2,7 @@ package com.karen.flymetool.hook.feature.packageinstaller
 
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedHelpers
+import de.robv.android.xposed.XC_MethodReplacement
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import com.karen.flymetool.hook.base.FeatureHook
 import com.karen.flymetool.hook.base.Logger
@@ -15,6 +16,7 @@ object PackageInstallerHook : FeatureHook {
     private var autoInstallEnabled = false
     private var skipInstallScanEnabled = false
     private var enableNativeInstallerEnabled = false
+    private var skipSafetyCheckEnabled = false
 
     override fun handle(lpparam: XC_LoadPackage.LoadPackageParam, packageName: String) {
         if (lpparam.packageName != "com.android.packageinstaller") return
@@ -22,6 +24,7 @@ object PackageInstallerHook : FeatureHook {
         skipInstallScanEnabled = XposedPrefs.isFeatureEnabled(lpparam, packageName, "skip_install_scan")
         enableNativeInstallerEnabled = XposedPrefs.isFeatureEnabled(lpparam, packageName, "enable_native_installer")
         autoInstallEnabled = XposedPrefs.isFeatureEnabled(lpparam, packageName, "auto_install")
+        skipSafetyCheckEnabled = XposedPrefs.isFeatureEnabled(lpparam, packageName, "skip_safety_check")
 
         try {
             if (skipInstallScanEnabled) {
@@ -30,7 +33,10 @@ object PackageInstallerHook : FeatureHook {
             if (enableNativeInstallerEnabled) {
                 hookNativeInstaller(lpparam)
             }
-            if (skipInstallScanEnabled || enableNativeInstallerEnabled) {
+            if (skipSafetyCheckEnabled) {
+                hookSafetyCheck(lpparam)
+            }
+            if (skipInstallScanEnabled || enableNativeInstallerEnabled || skipSafetyCheckEnabled) {
                 Logger.i(HOOK_NAME, "Hooks installed successfully")
             }
         } catch (e: Throwable) {
@@ -93,5 +99,35 @@ object PackageInstallerHook : FeatureHook {
             }
         )
         Logger.i(HOOK_NAME, "Hooked isCtsRunning -> true (native installer)")
+    }
+
+    private fun hookSafetyCheck(lpparam: XC_LoadPackage.LoadPackageParam) {
+        val clazz = XposedHelpers.findClass(ACTIVITY_CLASS, lpparam.classLoader)
+
+        // setVirusCheckTime -> 直接让 handler 发消息跳转
+        XposedHelpers.findAndHookMethod(
+            clazz,
+            "setVirusCheckTime",
+            object : XC_MethodReplacement() {
+                override fun replaceHookedMethod(param: MethodHookParam) {
+                    val mHandler = XposedHelpers.getObjectField(param.thisObject, "mHandler")
+                    XposedHelpers.callMethod(mHandler, "sendEmptyMessage", 5)
+                }
+            }
+        )
+        Logger.i(HOOK_NAME, "Hooked setVirusCheckTime")
+
+        // replaceOrInstall 前清空 mAppInfo
+        XposedHelpers.findAndHookMethod(
+            clazz,
+            "replaceOrInstall",
+            String::class.java,
+            object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    XposedHelpers.setObjectField(param.thisObject, "mAppInfo", null)
+                }
+            }
+        )
+        Logger.i(HOOK_NAME, "Hooked replaceOrInstall -> clear mAppInfo")
     }
 }

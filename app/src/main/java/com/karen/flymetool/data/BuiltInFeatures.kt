@@ -67,6 +67,8 @@ val builtInFeatures: Map<String, List<HookFeature>> = mapOf(
             dependsOn = "skip_install_scan"),
         HookFeature("enable_native_installer", "启用原生应用安装界面",
             description = "使用 Android 原生安装界面替换 Flyme 定制的安装界面"),
+        HookFeature("skip_safety_check", "跳过安全检查",
+            description = "跳过安装应用时的安全检验流程（setVirusCheckTime + replaceOrInstall）"),
     ),
     "android" to listOf(
         HookFeature("force_super_stereo", "强制立体音效",
