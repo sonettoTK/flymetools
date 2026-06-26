@@ -28,10 +28,13 @@ object PackageInstallerHook : FeatureHook {
             if (skipSafetyCheckEnabled) {
                 hookSafetyCheck(lpparam)
             }
+            if (autoInstallEnabled) {
+                hookStartInstallScan(lpparam)
+            }
             if (enableNativeInstallerEnabled) {
                 hookNativeInstaller(lpparam)
             }
-            if (skipSafetyCheckEnabled || enableNativeInstallerEnabled) {
+            if (skipSafetyCheckEnabled || autoInstallEnabled || enableNativeInstallerEnabled) {
                 Logger.i(HOOK_NAME, "Hooks installed successfully")
             }
         } catch (e: Throwable) {
@@ -40,27 +43,21 @@ object PackageInstallerHook : FeatureHook {
     }
 
     private fun hookSafetyCheck(lpparam: XC_LoadPackage.LoadPackageParam) {
+        val clazz = XposedHelpers.findClass(ACTIVITY_CLASS, lpparam.classLoader)
+
         XposedHelpers.findAndHookMethod(
-            ACTIVITY_CLASS,
-            lpparam.classLoader,
+            clazz,
             "setVirusCheckTime",
             object : XC_MethodReplacement() {
                 override fun replaceHookedMethod(param: MethodHookParam) {
-                    val thisObject = param.thisObject
-                    if (autoInstallEnabled) {
-                        XposedHelpers.callMethod(thisObject, "doInstallFlyme")
-                        Logger.d(HOOK_NAME, "Auto install triggered")
-                    } else {
-                        val mHandler = XposedHelpers.getObjectField(thisObject, "mHandler")
-                        XposedHelpers.callMethod(mHandler, "sendEmptyMessage", 5)
-                    }
+                    val mHandler = XposedHelpers.getObjectField(param.thisObject, "mHandler")
+                    XposedHelpers.callMethod(mHandler, "sendEmptyMessage", 5)
                 }
             }
         )
 
         XposedHelpers.findAndHookMethod(
-            ACTIVITY_CLASS,
-            lpparam.classLoader,
+            clazz,
             "replaceOrInstall",
             String::class.java,
             object : XC_MethodHook() {
@@ -69,6 +66,52 @@ object PackageInstallerHook : FeatureHook {
                 }
             }
         )
+
+        Logger.i(HOOK_NAME, "Hooked setVirusCheckTime")
+        Logger.i(HOOK_NAME, "Hooked replaceOrInstall -> clear mAppInfo")
+    }
+
+    private fun hookStartInstallScan(lpparam: XC_LoadPackage.LoadPackageParam) {
+        val clazz = XposedHelpers.findClass(ACTIVITY_CLASS, lpparam.classLoader)
+
+        XposedHelpers.findAndHookMethod(
+            clazz,
+            "startInstallScan",
+            object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    val thisObject = param.thisObject
+
+                    XposedHelpers.setBooleanField(thisObject, "mIsVirusCheckFinish", true)
+                    XposedHelpers.setBooleanField(thisObject, "mIsVirusCheckResultSafe", true)
+                    XposedHelpers.setBooleanField(thisObject, "receivedMzStoreInfo", true)
+                    XposedHelpers.setIntField(thisObject, "isDisposaled", 0)
+                    XposedHelpers.setBooleanField(thisObject, "isBlackApp", false)
+
+                    val mzStoreAppInfo = XposedHelpers.getObjectField(thisObject, "mzStoreAppInfo")
+                    if (mzStoreAppInfo != null) {
+                        XposedHelpers.setBooleanField(mzStoreAppInfo, "querySuccess", false)
+                        XposedHelpers.setBooleanField(mzStoreAppInfo, "showConfirm", false)
+                        XposedHelpers.setBooleanField(mzStoreAppInfo, "icpStatus", false)
+                        XposedHelpers.setBooleanField(mzStoreAppInfo, "isDisposalApp", false)
+                        XposedHelpers.setBooleanField(mzStoreAppInfo, "isBlackApp", false)
+                    }
+
+                    Logger.d(HOOK_NAME, "Skipped install scan")
+
+                    if (autoInstallEnabled) {
+                        XposedHelpers.callMethod(thisObject, "doInstallFlyme")
+                        Logger.d(HOOK_NAME, "Auto install triggered")
+                    } else {
+                        XposedHelpers.callMethod(thisObject, "updateViewForNewState", 3)
+                        Logger.d(HOOK_NAME, "Showing install confirm UI")
+                    }
+
+                    param.result = null
+                }
+            }
+        )
+
+        Logger.i(HOOK_NAME, "Hooked startInstallScan")
     }
 
     private fun hookNativeInstaller(lpparam: XC_LoadPackage.LoadPackageParam) {
