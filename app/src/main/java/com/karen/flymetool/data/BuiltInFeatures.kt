@@ -62,6 +62,9 @@ val builtInFeatures: Map<String, List<HookFeature>> = mapOf(
     "com.android.packageinstaller" to listOf(
         HookFeature("skip_install_scan", "跳过安装扫描",
             description = "跳过安装应用时的病毒扫描和应用中心查询流程"),
+        HookFeature("skip_safety_check", "跳过安全检查",
+            description = "安装应用时跳过安全检查(SafetyCheck)，直接进入安装流程",
+            dependsOn = "skip_install_scan"),
         HookFeature("auto_install", "自动安装",
             description = "跳过扫描后自动进入安装，无需手动点击安装按钮",
             dependsOn = "skip_install_scan"),
