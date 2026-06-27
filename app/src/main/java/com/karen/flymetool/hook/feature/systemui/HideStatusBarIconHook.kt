@@ -77,6 +77,10 @@ object HideStatusBarIconHook : FeatureHook {
 
         Logger.i(HOOK_NAME, "Hidden slots: $hiddenSlots")
 
+        if ("mobile" in hiddenSlots) {
+            hookMobileIcon(lpparam)
+        }
+
         when {
             FlymeVersionUtils.isFlyme12() -> mountFlyme12(lpparam)
             FlymeVersionUtils.isFlyme11() -> mountFlyme11(lpparam)
@@ -183,6 +187,35 @@ object HideStatusBarIconHook : FeatureHook {
             )
         } catch (e: Throwable) {
             Logger.e(HOOK_NAME, "Hook setIconVisibility failed", e)
+        }
+    }
+
+    private fun hookMobileIcon(lpparam: XC_LoadPackage.LoadPackageParam) {
+        try {
+            val mobileViewClass = XposedHelpers.findClass(
+                "com.android.systemui.statusbar.StatusBarMobileView",
+                lpparam.classLoader
+            )
+            XposedHelpers.findAndHookMethod(
+                mobileViewClass,
+                "applyMobileState",
+                lpparam.classLoader.loadClass("com.android.systemui.statusbar.MobileIconState"),
+                object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        val state = param.args[0] ?: return
+                        try {
+                            val visibleField = state.javaClass.getDeclaredField("visible")
+                            visibleField.isAccessible = true
+                            visibleField.setBoolean(state, false)
+                        } catch (e: Throwable) {
+                            Logger.e(HOOK_NAME, "Failed to set visible=false on MobileIconState", e)
+                        }
+                    }
+                }
+            )
+            Logger.i(HOOK_NAME, "Hooked StatusBarMobileView.applyMobileState for hiding mobile signal icon")
+        } catch (e: Throwable) {
+            Logger.e(HOOK_NAME, "Hook StatusBarMobileView failed, slot fallback will be used", e)
         }
     }
 
